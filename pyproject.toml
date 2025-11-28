@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "otfl"
+version = "0.1.0"
+description = "Gradient-descent-free kernel autoencoder / classifier"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "joblib",
+]
+
+[tool.setuptools]
+packages = ["otfl"]
