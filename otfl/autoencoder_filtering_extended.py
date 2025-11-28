@@ -52,11 +52,9 @@ def autoencoder_filtering_extended(y_data_new, AE, distance_type):
 
             sum_weights = weights.sum(axis=1, keepdims=True)  # (N_chunk, 1)
             # Avoid division by zero: if sum_weights == 0, keep the row as zeros.
-            zero_rows = (sum_weights == 0)
             sum_weights_safe = sum_weights.copy()
-            sum_weights_safe[zero_rows] = 1.0  # dummy to avoid 0/0
+            sum_weights_safe[sum_weights_safe == 0] = 1.0
             weights = weights / sum_weights_safe
-            weights[zero_rows] = 0.0           # explicitly enforce zero row
 
             hat_y_data[:, start:end] = AE["y_data"] @ weights.T  # (D, N_chunk)
     else:
@@ -70,11 +68,9 @@ def autoencoder_filtering_extended(y_data_new, AE, distance_type):
         weights = Kxa @ AE["B"]  # (N_new, N_train)
         sum_weights = weights.sum(axis=1, keepdims=True)  # (N_new, 1)
         # Avoid division by zero: if sum_weights == 0, keep the row as zeros.
-        zero_rows = (sum_weights == 0)
         sum_weights_safe = sum_weights.copy()
-        sum_weights_safe[zero_rows] = 1.0  # dummy to avoid 0/0
+        sum_weights_safe[sum_weights_safe == 0] = 1.0
         weights = weights / sum_weights_safe
-        weights[zero_rows] = 0.0           # explicitly enforce zero row
 
         hat_y_data = AE["y_data"] @ weights.T  # (D, N_new)
 
