@@ -86,8 +86,12 @@ def autoencoder_filtering_extended(y_data_new, AE, distance_type):
     norm_hat = np.linalg.norm(hat_y_data, axis=0)
     norm_new = np.linalg.norm(y_data_new, axis=0)
 
+    denom = norm_hat * norm_new
+    # Safe cosine similarity: avoid division by zero
+    cos_sim = np.zeros_like(dot)
+    mask = denom != 0
+    cos_sim[mask] = dot[mask] / denom[mask] # For denom == 0, cos_sim stays 0.
     # Avoid tiny numerical issues outside [-1, 1]
-    cos_sim = dot / (norm_hat * norm_new)
     cos_sim = np.clip(cos_sim, -1.0, 1.0)
 
     distance_2 = np.arccos(cos_sim) / np.pi
