@@ -1,13 +1,15 @@
 import numpy as np
+from joblib import Parallel, delayed
+
 from .combine_multiple_autoencoders_extended import (
     combine_multiple_autoencoders_extended,
-)  # Python version of combineMultipleAutoencodersExtended.m
+)
 
 
-def prediction_classifier_extended(y_data_new, CLF, distance_type):
+def prediction_classifier_extended(y_data_new, CLF, distance_type, n_jobs=1):
     """
     Python version of:
-        function [min_distance,labels_arr] = predictionClassifierExtended(y_data_new,CLF,distance_type)
+        [min_distance, labels_arr] = predictionClassifierExtended(y_data_new, CLF, distance_type)
 
     Parameters
     ----------
@@ -18,6 +20,8 @@ def prediction_classifier_extended(y_data_new, CLF, distance_type):
         keys: 'labels' (1D array-like), 'AE_arr_arr' (list of AE_arr per class).
     distance_type : str
         Distance type passed through to combine_multiple_autoencoders_extended.
+    n_jobs : int, optional
+        Number of parallel jobs over classes. 1 = no parallelism, -1 = all cores.
 
     Returns
     -------
@@ -27,28 +31,58 @@ def prediction_classifier_extended(y_data_new, CLF, distance_type):
         Predicted labels for each sample.
     """
     y_data_new = np.asarray(y_data_new, dtype=float)
+    AE_arr_arr = CLF["AE_arr_arr"]
+    labels = np.asarray(CLF["labels"])
 
-    C = len(CLF["AE_arr_arr"])
+    C = len(AE_arr_arr)
     _, N = y_data_new.shape
 
-    distance_matrix = np.zeros((C, N), dtype=float)
+    # ------------------------------------------------------------
+    # Fast path for the very common case: a single query (N = 1)
+    # ------------------------------------------------------------
+    if N == 1 and n_jobs == 1:
+        best_dist = np.inf
+        best_label = None
+        for AE_arr, lab in zip(AE_arr_arr, labels):
+            # distances shape: (N,) == (1,)
+            dist = combine_multiple_autoencoders_extended(
+                y_data_new, AE_arr, distance_type
+            )[0]
+            if dist < best_dist:
+                best_dist = dist
+                best_label = lab
 
-    # Fill distance matrix: one row per class
-    for i in range(C):
-        distances = combine_multiple_autoencoders_extended(
-            y_data_new, CLF["AE_arr_arr"][i], distance_type
-        )  # should be shape (N,)
-        distance_matrix[i, :] = distances
+        min_distance = np.array([best_dist], dtype=float)
+        labels_arr = np.array([best_label], dtype=labels.dtype)
+        return min_distance, labels_arr
 
-    # Minimum distance across classes (axis 0 = over rows/classes)
-    min_distance = np.min(distance_matrix, axis=0)  # shape (N,)
+    # ------------------------------------------------------------
+    # General path: compute distances per class, optionally in parallel
+    # ------------------------------------------------------------
+    if n_jobs == 1:
+        # Sequential: allocate once and fill
+        distance_matrix = np.empty((C, N), dtype=float)
+        for i, AE_arr in enumerate(AE_arr_arr):
+            distance_matrix[i, :] = combine_multiple_autoencoders_extended(
+                y_data_new, AE_arr, distance_type
+            )
+    else:
+        # Parallel over classes
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(combine_multiple_autoencoders_extended)(
+                y_data_new, AE_arr, distance_type
+            )
+            for AE_arr in AE_arr_arr
+        )
+        # results is a list of arrays of shape (N,)
+        distance_matrix = np.vstack(results)  # shape (C, N)
 
-    # Assign labels corresponding to min distances
-    labels = np.asarray(CLF["labels"])
-    labels_arr = np.zeros(N, dtype=labels.dtype)
-
-    for i in range(C):
-        mask = distance_matrix[i, :] == min_distance
-        labels_arr[mask] = labels[i]
+    # ------------------------------------------------------------
+    # Vectorised label assignment
+    # ------------------------------------------------------------
+    # argmin over classes gives index of best class per sample
+    best_idx = np.argmin(distance_matrix, axis=0)         # shape (N,)
+    min_distance = distance_matrix[best_idx, np.arange(N)]
+    labels_arr = labels[best_idx]
 
     return min_distance, labels_arr

@@ -118,7 +118,7 @@ def main(
 
         # Get predictions on the global test set
         min_dist, labels_pred = prediction_classifier_extended(
-            XTest, CLF, "folding"
+            XTest, CLF, "folding", n_jobs=-1
         )
         min_distance_arr[i] = min_dist
         labels_arr_arr[i] = labels_pred

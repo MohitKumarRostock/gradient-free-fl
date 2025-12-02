@@ -1,5 +1,5 @@
 pyproject.toml
-otfl/--init__.py
+otfl/__init__.py
 otfl/autoencoder.py
 otfl/autoencoder_filtering_extended.py
 otfl/classifier.py
